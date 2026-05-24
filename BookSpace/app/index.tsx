@@ -1,283 +1,158 @@
 // IMPORTAÇÕES
-import React, {
-  useEffect,
-  useState
-} from 'react';
-
+import React, { useEffect, useState } from 'react';
 import {
-  Alert,
-  FlatList,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+  Alert,              // Exibe alertas de sucesso/erro
+  FlatList,           // Lista otimizada para muitos itens
+  StyleSheet,         // Criação de estilos
+  Text,               // Texto na tela
+  TextInput,          // Campo de entrada
+  TouchableOpacity,   // Botão clicável
+  View                // Container genérico
 } from 'react-native';
 
 import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  getDocs
+  addDoc,             // Adiciona documento no Firestore
+  collection,         // Referência a uma coleção
+  deleteDoc,          // Exclui documento
+  doc,                // Referência a documento específico
+  getDocs             // Busca documentos de uma coleção
 } from 'firebase/firestore';
 
-import { Ionicons } from '@expo/vector-icons';
-
-import { db } from './firebaseConfig';
-
+import { Ionicons } from '@expo/vector-icons'; // Ícones prontos
+import { db } from '../firebaseConfig/firebaseConfig'; // Configuração Firebase
 
 // MODEL
-// Interface que representa um livro
-
+// Interface que define a estrutura dos dados de um livro
 interface Livro {
-
-  // ID do Firebase
-  id?: string;
-
-  // Título
-  titulo: string;
-
-  // Autor
-  autor: string;
-
-  // Preço
-  preco: number;
-
-  // Avaliação
-  avaliacao: string;
+  id?: string;       // ID gerado automaticamente pelo Firebase
+  titulo: string;    // Título do livro
+  autor: string;     // Autor
+  preco: number;     // Preço
+  avaliacao: string; // Avaliação
 }
 
 // COMPONENTE PRINCIPAL
-
 export default function App() {
-  // STATES
-  const [titulo, setTitulo] =   // Campo título
-    useState<string>('');
+  // STATES - controlam os dados e inputs do app
+  const [titulo, setTitulo] = useState<string>('');       // Campo título
+  const [autor, setAutor] = useState<string>('');         // Campo autor
+  const [preco, setPreco] = useState<string>('');         // Campo preço (formatado)
+  const [avaliacao, setAvaliacao] = useState<string>(''); // Campo avaliação
+  const [livros, setLivros] = useState<Livro[]>([]);      // Lista de livros cadastrados
+  const [mensagemErro, setMensagemErro] = useState<string>(''); // Mensagem de erro
 
-  const [autor, setAutor] =   // Campo autor
-    useState<string>('');
-
-  const [preco, setPreco] =   // Campo preço
-    useState<string>('');
-
-  const [avaliacao, setAvaliacao] =   // Campo avaliação
-  useState<string>('');
-
-  const [livros, setLivros] =  // Lista de livros
-    useState<Livro[]>([]);
-
-  const [mensagemErro, setMensagemErro] =  // Mensagem erro
-    useState<string>('');
-
-  // CONTROLLER - BUSCAR LIVROS
-
+  // BUSCAR LIVROS - lê todos os documentos da coleção "livros"
   async function buscarLivros() {
-
-    const querySnapshot = await getDocs(  // Busca coleção livros
-      collection(db, 'livros')
-    );
-
-    let lista: Livro[] = [];    // Lista temporária
-
-    querySnapshot.forEach((documento) => {     // Percorre documentos
+    const querySnapshot = await getDocs(collection(db, 'livros'));
+    let lista: Livro[] = [];
+    querySnapshot.forEach((documento) => {
       lista.push({
-        // ID Firebase
-        id: documento.id,
-        // Dados
-        ...(documento.data() as Livro)
+        id: documento.id,              // pega o ID do documento
+        ...(documento.data() as Livro) // pega os dados convertidos para Livro
       });
     });
-
-    // Atualiza state
-    setLivros(lista);
+    setLivros(lista); // atualiza o state com a lista
   }
 
-  // CONTROLLER - FORMATAR PREÇO
-
+  // FORMATAR PREÇO - transforma o input em formato monetário
   function formatarPreco(valor: string) {
-    // Remove tudo que não for número
-    let numeros =
-      valor.replace(/\D/g, '');
-
-    // Evita erro se vazio
+    let numeros = valor.replace(/\D/g, ''); // remove tudo que não é número
     if (numeros === '') {
       setPreco('');
       return;
     }
-
-    // Formata valor
-    let valorFormatado = (
-      Number(numeros) / 100
-    )
+    let valorFormatado = (Number(numeros) / 100)
       .toFixed(2)
       .replace('.', ',');
-
-    // Atualiza state
-    setPreco(`R$ ${valorFormatado}`);
+    setPreco(`R$ ${valorFormatado}`); // atualiza state com valor formatado
   }
 
-
-  // CONTROLLER - VALIDAR LIVRO
+  // VALIDAR LIVRO - checa se os campos estão corretos
   function validarLivro(): string | null {
+    if (!titulo.trim()) return 'O título é obrigatório';
+    if (titulo.trim().length < 3) return 'Título inválido';
 
-    // VALIDAR TÍTULO
-    if (!titulo.trim()) {
-      return 'O título é obrigatório';
-    }
+    if (!autor.trim()) return 'O autor é obrigatório';
+    if (autor.trim().length < 3) return 'Autor inválido';
 
-    if (titulo.trim().length < 3) {
-      return
-    }
+    if (!preco.trim()) return 'O preço é obrigatório';
+    const valorNumerico = Number(preco.replace('R$', '').replace(',', '.').trim());
+    if (isNaN(valorNumerico)) return 'Preço inválido';
+    if (valorNumerico <= 0) return 'Preço inválido';
+    if (valorNumerico > 200) return 'Preço acima do limite';
 
-
-    // VALIDAR AUTOR
-    if (!autor.trim()) {
-      return 'O autor é obrigatório';
-    }
-
-    if (autor.trim().length < 3) {
-      return 'Autor inválido';
-    }
-
-
-    // VALIDAR PREÇO
-    if (!preco.trim()) {
-      return 'O preço é obrigatório';
-    }
-
-    // Remove máscara
-    const valorNumerico = Number(
-      preco
-        .replace('R$', '')
-        .replace(',', '.')
-        .trim()
-    );
-
-    // Verifica NaN
-    if (isNaN(valorNumerico)) {
-      return 'Preço inválido';
-    }
-
-    // REGRAS DE NEGÓCIO
-
-    // Preço mínimo
-    if (valorNumerico <= 0) {
-      return
-    }
-
-    // Preço máximo
-    if (valorNumerico > 200) {
-      return
-    }
-
-    // IMPEDIR DUPLICADOS
+    // impede duplicados
     const livroExistente = livros.find(
-      (livro) =>
-        livro.titulo.toLowerCase().trim() ===
-        titulo.toLowerCase().trim()
+      (livro) => livro.titulo.toLowerCase().trim() === titulo.toLowerCase().trim()
     );
+    if (livroExistente) return 'Livro já cadastrado';
 
-    if (livroExistente) {
-      return 'Livro já cadastrado';
-    }
-
-    // Sem erros
-    return null;
+    return null; // sem erros
   }
 
-  // CONTROLLER - CADASTRAR LIVRO
+  // CADASTRAR LIVRO - adiciona novo documento no Firestore
   async function cadastrarLivro() {
-    // Executa validação
     const erro = validarLivro();
-    // Se houver erro
     if (erro) {
-      setMensagemErro(erro);
+      setMensagemErro(erro); // mostra erro
       return;
     }
+    setMensagemErro(''); // limpa erro
 
-    // Limpa erro
-    setMensagemErro('');
-
-    // Objeto livro
+    // objeto livro pronto para salvar
     const livro: Livro = {
       titulo,
       autor,
-      preco: Number(
-        preco
-          .replace('R$', '')
-          .replace(',', '.')
-          .trim()
-      ),
+      preco: Number(preco.replace('R$', '').replace(',', '.').trim()),
       avaliacao,
     };
 
-    // Salva Firebase
-    await addDoc(
-      collection(db, 'livros'),
-      livro
-    );
+    await addDoc(collection(db, 'livros'), livro); // salva no Firebase
+    Alert.alert('Sucesso', 'Livro cadastrado');    // alerta de sucesso
 
-    // Mensagem sucesso
-    Alert.alert(
-      'Sucesso',
-      'Livro cadastrado'
-    );
-
-    // Limpar campos
+    // limpa os campos
     setTitulo('');
     setAutor('');
     setPreco('');
     setAvaliacao('');
-    // Atualiza lista
-    buscarLivros();
+
+    buscarLivros(); // atualiza lista
   }
 
-  // CONTROLLER - EXCLUIR LIVRO
+  // EXCLUIR LIVRO - remove documento pelo ID
   async function excluirLivro(id: string) {
-    // Remove documento
-    await deleteDoc(
-      doc(db, 'livros', id)
-    );
-    Alert.alert(
-      'Sucesso',
-      'Livro excluído'
-    );
-    // Atualiza lista
-    buscarLivros();
+    await deleteDoc(doc(db, 'livros', id)); // exclui no Firebase
+    Alert.alert('Sucesso', 'Livro excluído');
+    buscarLivros(); // atualiza lista
   }
 
-  // useEffect
+  // useEffect - executa buscarLivros ao carregar o app
   useEffect(() => {
     buscarLivros();
   }, []);
 
-  // VIEW
+  // VIEW - parte visual
   return (
     <View style={styles.container}>
-      {/*formulario*/}
+      {/* HEADER */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>📚 BOOKSPACE</Text>
+      </View>
 
+      {/* FORMULÁRIO */}
       <View style={styles.formulario}>
-        {/* INPUT TÍTULO */}
-
         <TextInput
           style={styles.input}
           placeholder="Título do livro"
           value={titulo}
           onChangeText={setTitulo}
         />
-
-        {/* INPUT AUTOR */}
-
         <TextInput
           style={styles.input}
           placeholder="Autor"
           value={autor}
           onChangeText={setAutor}
         />
-
-        {/* INPUT PREÇO */}
-
         <TextInput
           style={styles.input}
           placeholder="Preço"
@@ -285,9 +160,6 @@ export default function App() {
           value={preco}
           onChangeText={formatarPreco}
         />
-
-        {/* INPUT AVALIAÇÃO */}
-
         <TextInput
           style={styles.input}
           placeholder="Avaliação do livro"
@@ -295,88 +167,37 @@ export default function App() {
           onChangeText={setAvaliacao}
         />
 
-        {/* MENSAGEM DE ERRO  */}
+        {/* Mensagem de erro */}
+        {mensagemErro !== '' && (
+          <Text style={styles.erro}>⚠️ {mensagemErro}</Text>
+        )}
 
-        {
-          mensagemErro !== '' && (
-            <Text style={styles.erro}>
-              ⚠️ {mensagemErro}
-            </Text>
-
-          )
-        }
-
-        {/* BOTÃO CADASTRAR */}
-
-        <TouchableOpacity
-          style={styles.botao}
-          onPress={cadastrarLivro}
-        >
-
-          <Ionicons
-            name="add-circle"
-            size={20}
-            color="#FFF"
-          />
-
-          <Text style={styles.textoBotao}>
-            Cadastrar Livro
-          </Text>
-
+        {/* Botão cadastrar */}
+        <TouchableOpacity style={styles.botao} onPress={cadastrarLivro}>
+          <Ionicons name="add-circle" size={20} color="#FFF" />
+          <Text style={styles.textoBotao}>Cadastrar Livro</Text>
         </TouchableOpacity>
-
       </View>
 
       {/* LISTA DE LIVROS */}
-
       <FlatList
-
         data={livros}
         keyExtractor={(item) => item.id!}
         showsVerticalScrollIndicator={false}
         renderItem={({ item }) => (
-
           <View style={styles.card}>
+            <Text style={styles.nomeLivro}>{item.titulo}</Text>
+            <Text style={styles.info}>✍️ Autor: {item.autor}</Text>
+            <Text style={styles.info}>💰 R$ {item.preco.toFixed(2)}</Text>
+            <Text style={styles.info}>📌 {item.avaliacao}</Text>
 
-            {/* TOPO CARD */}
-          
-            <Text style={styles.nomeLivro}>
-              {item.titulo}
-            </Text>
-
-            {/* AUTOR */}
-            <Text style={styles.info}>
-              ✍️ Autor: {item.autor}
-            </Text>
-
-            {/* PREÇO */}
-            <Text style={styles.info}>
-              💰 R$ {item.preco.toFixed(2)}
-            </Text>
-
-            {/* AVALIAÇÃO */}
-            <Text style={styles.info}>
-              📌 {item.avaliacao}
-            </Text>
-
-            {/* BOTÃO EXCLUIR */}
+            {/* Botão excluir */}
             <TouchableOpacity
               style={styles.botaoExcluir}
-              onPress={() =>
-                excluirLivro(item.id!)
-              }
+              onPress={() => excluirLivro(item.id!)}
             >
-
-              <Ionicons
-                name="trash"
-                size={18}
-                color="#FFF"
-              />
-
-              <Text style={styles.textoExcluir}>
-                Excluir
-              </Text>
-
+              <Ionicons name="trash" size={18} color="#FFF" />
+              <Text style={styles.textoExcluir}>Excluir</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -386,9 +207,7 @@ export default function App() {
 }
 
 // ESTILOS
-
 const styles = StyleSheet.create({
-  // Container principal
   container: {
     flex: 1,
     backgroundColor: '#F4F4F4',
@@ -396,8 +215,22 @@ const styles = StyleSheet.create({
     paddingTop: 25
   },
 
+  // Header
+  header: {
+    backgroundColor: '#0A1D5C',
+    paddingVertical: 20,
+    borderRadius: 12,
+    marginBottom: 20,
+    alignItems: 'center',
+    elevation: 5
+  },
+  headerTitle: {
+    color: '#FFF',
+    fontSize: 24,
+    fontWeight: 'bold',
+    letterSpacing: 2
+  },
 
-  // Formulário
   formulario: {
     backgroundColor: '#FFF',
     padding: 20,
@@ -405,8 +238,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     elevation: 5
   },
-
-  // Inputs
   input: {
     backgroundColor: '#F8F8F8',
     padding: 15,
@@ -416,16 +247,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#EEE'
   },
-
-  // Mensagem erro
   erro: {
     color: '#5C0A0A',
     marginBottom: 12,
     fontWeight: 'bold',
     fontSize: 14
   },
-
-  // Botão cadastrar
   botao: {
     backgroundColor: '#0A1D5C',
     padding: 15,
@@ -435,15 +262,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10
   },
-
-  // Texto botão
   textoBotao: {
     color: '#FFF',
     fontWeight: 'bold',
     fontSize: 16
   },
-
-  // Card livro
   card: {
     backgroundColor: '#FFF',
     padding: 18,
@@ -451,24 +274,17 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     elevation: 4
   },
-
-  // Nome livro
   nomeLivro: {
     fontSize: 23,
     marginBottom: 8,
     fontWeight: 'bold',
     color: '#333'
   },
-
-  // Informações
   info: {
     fontSize: 17,
     color: '#555',
     marginBottom: 10
   },
-
-
-  // Botão excluir
   botaoExcluir: {
     backgroundColor: '#700505',
     padding: 12,
@@ -478,11 +294,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8
   },
-
-  // Texto excluir
   textoExcluir: {
     color: '#FFF',
     fontWeight: 'bold'
   }
-
 });
