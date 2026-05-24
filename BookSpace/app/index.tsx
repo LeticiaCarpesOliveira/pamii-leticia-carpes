@@ -19,7 +19,7 @@ import {
 } from 'firebase/firestore';
 
 import { Ionicons } from '@expo/vector-icons'; // Ícones prontos
-import { db } from '../firebaseConfig/firebaseConfig'; // Configuração Firebase
+import { db } from '@/firebaseConfig/firebaseConfig'; // Configuração Firebase
 
 // MODEL
 // Interface que define a estrutura dos dados de um livro
